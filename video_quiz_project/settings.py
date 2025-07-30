@@ -26,9 +26,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-h8&!t&_e+g%4&n$2iux3_4se+z=7!dzz3w*2*f^@=k3yhwlv_-'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -63,7 +63,9 @@ MIDDLEWARE = [
 ]
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # For development only, restrict in production
+CORS_ALLOWED_ORIGINS = [
+    "https://your-netlify-site.netlify.app",  # Update after Netlify deploy
+]
 
 # Configure REST Framework
 REST_FRAMEWORK = {
