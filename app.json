@@ -1,0 +1,32 @@
+{
+  "name": "Video Quiz App",
+  "description": "A Django-based video quiz application",
+  "keywords": ["django", "python", "quiz", "video"],
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [
+    "heroku-postgresql:hobby-dev"
+  ],
+  "scripts": {
+    "postdeploy": "python manage.py migrate"
+  },
+  "env": {
+    "DJANGO_SECRET_KEY": {
+      "description": "Django secret key for security",
+      "generator": "secret"
+    },
+    "DEBUG": {
+      "description": "Django debug mode",
+      "value": "False"
+    }
+  }
+}
