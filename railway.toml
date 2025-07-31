@@ -1,8 +1,4 @@
-[build]
-builder = "NIXPACKS"
-
 [deploy]
-startCommand = "gunicorn video_quiz_project.wsgi:application --bind 0.0.0.0:$PORT"
 healthcheckPath = "/admin/login/"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
