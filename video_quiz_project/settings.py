@@ -22,7 +22,9 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 # Railway: set ALLOWED_HOSTS in environment variables, fallback to '*'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'videoquizapp-production.up.railway.app').split(',')
 
-CSRF_TRUSTED_ORIGINS = [ 'https://videoquizapp-production.up.railway.app',
+CSRF_TRUSTED_ORIGINS = [
+    'https://videoquizapp-production.up.railway.app',
+    'https://thriving-bubblegum-bf086a.netlify.app',
 ]
 
 # Application definition
@@ -58,7 +60,9 @@ MIDDLEWARE = [
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
-    os.environ.get('FRONTEND_URL', 'https://your-netlify-site.netlify.app'),
+    os.environ.get('FRONTEND_URL', 'https://your-app-name.netlify.app'),
+    'https://videoquizapp.netlify.app',
+    'https://thriving-bubblegum-bf086a.netlify.app',  # Your actual Netlify domain
 ]
 
 # REST Framework config
