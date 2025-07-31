@@ -138,3 +138,25 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Auto-create superuser in production
+if not DEBUG and os.environ.get('RAILWAY_ENVIRONMENT'):
+    import django
+    from django.core.management import execute_from_command_line
+    from django.db import connection
+    from django.db.utils import OperationalError
+    
+    def create_superuser_if_needed():
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1 FROM users_user WHERE is_superuser = true LIMIT 1")
+                if not cursor.fetchone():
+                    from users.models import User
+                    User.objects.create_superuser(
+                        username=os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin'),
+                        email=os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@example.com'),
+                        password=os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'SecurePassword123!'),
+                        is_superadmin=True
+                    )
+        except (OperationalError, Exception):
+            pass  # Ignore errors during startup

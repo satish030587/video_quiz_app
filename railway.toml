@@ -1,12 +1,8 @@
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+builder = "NIXPACKS"
 
 [deploy]
-startCommand = "gunicorn video_quiz_project.wsgi:application --bind 0.0.0.0:$PORT"
+startCommand = "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn video_quiz_project.wsgi:application --bind 0.0.0.0:$PORT"
 healthcheckPath = "/admin/login/"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
-
-[env]
-PORT = "8000"
