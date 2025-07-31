@@ -22,6 +22,9 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 # Railway: set ALLOWED_HOSTS in environment variables, fallback to '*'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
+CSRF_TRUSTED_ORIGINS = [ 'https://videoquizapp-production.up.railway.app/',
+]
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
