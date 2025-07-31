@@ -70,6 +70,8 @@ REST_FRAMEWORK = {
 
 ROOT_URLCONF = 'video_quiz_project.urls'
 
+
+# Templates
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
