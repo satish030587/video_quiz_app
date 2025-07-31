@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ['python39', 'pip']
+
+[phases.install]
+cmd = 'pip install -r requirements.txt'
+
+[phases.build]
+cmd = 'python manage.py collectstatic --noinput'
+
+[start]
+cmd = 'python manage.py migrate && python manage.py create_superuser && gunicorn video_quiz_project.wsgi:application --bind 0.0.0.0:$PORT'
