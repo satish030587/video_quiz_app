@@ -20,9 +20,9 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-h8&!t&_e+g%4&n
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Railway: set ALLOWED_HOSTS in environment variables, fallback to '*'
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'videoquizapp-production.up.railway.app').split(',')
 
-CSRF_TRUSTED_ORIGINS = [ 'https://videoquizapp-production.up.railway.app/',
+CSRF_TRUSTED_ORIGINS = [ 'https://videoquizapp-production.up.railway.app',
 ]
 
 # Application definition
