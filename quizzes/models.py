@@ -54,6 +54,28 @@ class QuizAttempt(models.Model):
         
     def __str__(self):
         return f"{self.user.username} - {self.video.title} - Attempt {self.attempt_number}"
+        
+    def save(self, *args, **kwargs):
+        """Override save to automatically update user progress when attempt status changes"""
+        # Save the attempt first
+        super().save(*args, **kwargs)
+        
+        # Only update progress if status is completed (quiz is finished)
+        if self.status == 'completed':
+            from users.models import UserProgress
+            progress, created = UserProgress.objects.get_or_create(user=self.user)
+            
+            # If passed, add to videos_passed and remove from videos_failed
+            if self.is_passed:
+                progress.videos_passed.add(self.video)
+                if self.video in progress.videos_failed.all():
+                    progress.videos_failed.remove(self.video)
+            # If failed on second attempt, add to videos_failed
+            elif self.attempt_number >= 2:
+                progress.videos_failed.add(self.video)
+                
+            # Always sync with all quiz attempts to ensure consistency
+            progress.sync_with_quiz_attempts()
 
 class UserAnswer(models.Model):
     quiz_attempt = models.ForeignKey(QuizAttempt, on_delete=models.CASCADE, related_name='user_answers')

@@ -17,14 +17,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-h8&!t&_e+g%4&n$2iux3_4se+z=7!dzz3w*2*f^@=k3yhwlv_-')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = True
 
-# Railway: set ALLOWED_HOSTS in environment variables, fallback to '*'
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'videoquizapp-production.up.railway.app').split(',')
+# For local development
+ALLOWED_HOSTS = ['*']
 
 CSRF_TRUSTED_ORIGINS = [
     'https://videoquizapp-production.up.railway.app',
-    'https://thriving-bubblegum-bf086a.netlify.app',
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
 ]
 
 # Application definition
@@ -59,11 +60,14 @@ MIDDLEWARE = [
 ]
 
 # CORS settings
+CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins in development
 CORS_ALLOWED_ORIGINS = [
-    os.environ.get('FRONTEND_URL', 'https://your-app-name.netlify.app'),
-    'https://videoquizapp.netlify.app',
-    'https://thriving-bubblegum-bf086a.netlify.app',  # Your actual Netlify domain
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
 ]
+CORS_ALLOW_CREDENTIALS = True
 
 # REST Framework config
 REST_FRAMEWORK = {
@@ -96,11 +100,12 @@ WSGI_APPLICATION = 'video_quiz_project.wsgi.application'
 AUTH_USER_MODEL = 'users.User'
 
 # Database
-# Use Railway's DATABASE_URL if available, else fallback to local sqlite3
+# Use SQLite for local development
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL', f'sqlite:///{BASE_DIR / "db.sqlite3"}')
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
 
 # Password validation
@@ -124,6 +129,11 @@ LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
+
+# Session settings
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'  # Options: 'Strict', 'Lax', 'None'
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'

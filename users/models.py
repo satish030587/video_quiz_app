@@ -27,78 +27,61 @@ class UserProgress(models.Model):
         return f"{self.user.username}'s Progress"
     
     def recalculate_progress(self):
-        """Recalculate user progress based on current quiz attempts"""
-        from quizzes.models import QuizAttempt
+        """Calculate overall progress based on passed videos"""
+        from videos.models import Video
+        total_videos = Video.objects.filter(is_active=True).count()
+        passed_videos = self.videos_passed.count()
         
-        # Get all passed and failed videos
-        passed_videos = []
-        failed_videos = []
-        total_retries = 0
-        
-        # Get all videos
-        all_videos = Video.objects.filter(is_active=True)
-        
-        for video in all_videos:
-            # Get all attempts for this video by this user
-            attempts = QuizAttempt.objects.filter(
-                user=self.user, 
-                video=video,
-                status='completed'
-            ).order_by('attempt_number')
+        if total_videos > 0:
+            self.overall_progress = (passed_videos / total_videos) * 100
+        else:
+            self.overall_progress = 0
             
-            if attempts.exists():
-                # Count retries (attempts beyond the first one)
-                total_retries += max(0, attempts.count() - 1)
-                
-                # Check if user has passed this video
-                passed_attempt = attempts.filter(is_passed=True).first()
-                if passed_attempt:
-                    passed_videos.append(video)
-                else:
-                    # Check if user has exhausted all attempts (2 attempts max)
-                    if attempts.count() >= 2:
-                        failed_videos.append(video)
-        
-        # Update the many-to-many relationships
-        self.videos_passed.set(passed_videos)
-        self.videos_failed.set(failed_videos)
-        self.total_retries = total_retries
-        
-        # Calculate overall progress
-        total_videos = all_videos.count()
-        passed_count = len(passed_videos)
-        self.overall_progress = (passed_count / total_videos * 100) if total_videos > 0 else 0
-        
         self.save()
         return {
-            'passed_videos': passed_count,
-            'failed_videos': len(failed_videos),
-            'total_retries': total_retries,
-            'overall_progress': float(self.overall_progress)
+            'overall_progress': self.overall_progress,
+            'videos_passed': passed_videos,
+            'total_videos': total_videos
         }
     
     def reset_progress(self):
-        """Reset user progress and delete all quiz attempts"""
-        from quizzes.models import QuizAttempt
-        
-        # Delete all quiz attempts for this user
-        QuizAttempt.objects.filter(user=self.user).delete()
-        
-        # Clear progress
+        """Reset all progress for this user"""
         self.videos_passed.clear()
         self.videos_failed.clear()
         self.total_retries = 0
         self.overall_progress = 0
         self.save()
+    
+    def sync_with_quiz_attempts(self):
+        """Sync the videos_passed with successful quiz attempts"""
+        from quizzes.models import QuizAttempt
         
-        return True
-    
-    @classmethod
-    def update_user_progress(cls, user):
-        """Class method to update progress for a specific user"""
-        progress, created = cls.objects.get_or_create(user=user)
-        return progress.recalculate_progress()
-    
+        # Get all passed attempts for this user
+        passed_attempts = QuizAttempt.objects.filter(
+            user=self.user,
+            is_passed=True
+        )
+        
+        # Add all videos from passed attempts to videos_passed
+        for attempt in passed_attempts:
+            if attempt.video not in self.videos_passed.all():
+                self.videos_passed.add(attempt.video)
+                
+        # Remove videos from videos_passed that don't have passed attempts
+        passed_video_ids = passed_attempts.values_list('video', flat=True)
+        for video in self.videos_passed.all():
+            if video.id not in passed_video_ids:
+                self.videos_passed.remove(video)
+                
+        # Update total retries
+        self.total_retries = QuizAttempt.objects.filter(
+            user=self.user,
+            attempt_number__gt=1
+        ).count()
+        
+        # Recalculate overall progress
+        return self.recalculate_progress()
+        
     @classmethod
     def recalculate_all_progress(cls):
         """Recalculate progress for all users"""

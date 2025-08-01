@@ -1,343 +1,243 @@
-import React, { useEffect, useRef, useState } from 'react';
-import ReactPlayer from 'react-player';
-import './VideoPlayer.css';
-import { videoService } from '../services';
+import React, { useRef, useEffect, useState } from 'react';
+import YouTube from 'react-youtube';
 
-const VideoPlayer = ({ 
-  videoUrl, 
-  onVideoEnded, 
-  onTimeUpdate, 
-  isQuizActive,
-  resetVideoOnNewQuiz = false 
-}) => {
+const VideoPlayer = ({ videoUrl, onEnded, autoplay = false }) => {
   const videoRef = useRef(null);
-  const reactPlayerRef = useRef(null);
-  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [videoSource, setVideoSource] = useState('');
-  const [currentSourceIndex, setCurrentSourceIndex] = useState(0);
-  const [sources, setSources] = useState([]);
-  const [isYouTube, setIsYouTube] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [error, setError] = useState(null);
+  const [videoType, setVideoType] = useState(null); // 'mp4' or 'youtube'
+  const [youtubeId, setYoutubeId] = useState(null);
   
-  // Check fullscreen status
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, []);
+  // Extract YouTube ID from URL
+  const getYoutubeId = (url) => {
+    if (!url) return null;
+    
+    // Regular expression to extract YouTube ID from various YouTube URL formats
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[7].length === 11) ? match[7] : null;
+  };
   
-  // Process video sources on component mount or when videoUrl changes
-  useEffect(() => {
+  // Get the actual video URL from the videoUrl prop (which might be an object or string)
+  const getActualVideoUrl = () => {
+    if (!videoUrl) return '';
     
-    setLoading(true);
-    setError(null);
-    setInitialLoadComplete(false); // Reset on new video load
-    
-    // Create an array of potential video sources with local files prioritized
-    let videoSources = [];
-    
-    // Handle case when videoUrl is an object containing video_file and video_url
-    if (typeof videoUrl === 'object') {
-      // Prioritize local file over external URL - this is crucial
-      if (videoUrl.video_file) {
-        videoSources.push(videoUrl.video_file);
-      }
-      if (videoUrl.video_url && videoUrl.video_url !== videoUrl.video_file) {
-        videoSources.push(videoUrl.video_url);
-      }
-    } 
-    // Handle case when videoUrl is a string
-    else if (typeof videoUrl === 'string' && videoUrl) {
-      videoSources.push(videoUrl);
+    // If videoUrl is an object with video_url or video_file properties
+    if (typeof videoUrl === 'object' && videoUrl !== null) {
+      return videoUrl.video_url || videoUrl.video_file || '';
     }
     
-    // If no sources found, set error
-    if (videoSources.length === 0) {
+    // If videoUrl is already a string
+    if (typeof videoUrl === 'string') {
+      return videoUrl;
+    }
+    
+    return '';
+  };
+  
+  // Determine the video type and format URL when component mounts or URL changes
+  useEffect(() => {
+    // Get the actual video URL from the videoUrl prop (which might be an object or string)
+    const getActualVideoUrl = () => {
+      if (!videoUrl) return '';
       
-      setError("No video URL provided");
-      setLoading(false);
+      // If videoUrl is an object with video_url or video_file properties
+      if (typeof videoUrl === 'object' && videoUrl !== null) {
+        return videoUrl.video_url || videoUrl.video_file || '';
+      }
+      
+      // If videoUrl is already a string
+      if (typeof videoUrl === 'string') {
+        return videoUrl;
+      }
+      
+      return '';
+    };
+    
+    const actualUrl = getActualVideoUrl();
+    
+    if (!actualUrl) {
+      setVideoType(null);
+      return;
+    }
+
+    // Check if it's a YouTube URL
+    const ytId = getYoutubeId(actualUrl);
+    if (ytId) {
+      console.log('YouTube video detected, ID:', ytId);
+      setVideoType('youtube');
+      setYoutubeId(ytId);
       return;
     }
     
-    // Process each URL to ensure they are properly formatted
-    const processedSources = videoSources.map(url => {
-      // If it's a relative URL (starts with /media) or just a filename, construct the full URL
-      if (url.startsWith('/media') || (!url.startsWith('http') && !url.startsWith('/'))) {
-        // For media files, use the streaming endpoint
-        if (typeof videoUrl === 'object' && videoUrl.id) {
-          return videoService.streamVideo(videoUrl.id);
-        }
-        
-        // Fallback to direct URL if no video ID
-        const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
-        let processedUrl = `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
-        
-        // Add a cache-busting parameter for local files
-        const timestamp = new Date().getTime();
-        return `${processedUrl}?t=${timestamp}`;
-      }
-      return url;
-    });
-    
-    setSources(processedSources);
-    setCurrentSourceIndex(0); // Reset to first source
-    
+    // Otherwise it's a regular video file
+    console.log('MP4 video detected:', actualUrl);
+    setVideoType('mp4');
     
   }, [videoUrl]);
   
-  // Function to get video blob
-  const loadFullVideo = async (url) => {
-    if (!url || isYouTube) return; // Skip for YouTube videos
+  // Format the URL for MP4 videos
+  const getFormattedVideoUrl = () => {
+    const actualUrl = getActualVideoUrl();
     
-    try {
-      
-      setLoading(true);
-      
-      // Fetch the video as a blob
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Range': 'bytes=0-', // Request the full video
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch video: ${response.status} ${response.statusText}`);
-      }
-      
-      const videoBlob = await response.blob();
-      const videoBlobUrl = URL.createObjectURL(videoBlob);
-      
-      
-      setVideoSource(videoBlobUrl);
+    if (!actualUrl || videoType === 'youtube') return null;
+    
+    // If URL is already a full URL (http/https), use it as is
+    if (actualUrl.startsWith('http://') || actualUrl.startsWith('https://')) {
+      return actualUrl;
+    }
+    
+    // If it's a relative path, prefix with API base URL
+    return `http://localhost:8000${actualUrl}`;
+  };
+
+  // YouTube player options
+  const youtubeOpts = {
+    height: '100%',
+    width: '100%',
+    playerVars: {
+      autoplay: autoplay ? 1 : 0,
+      controls: 1,
+      disablekb: 0,
+      rel: 0, // Don't show related videos
+      modestbranding: 1,
+    },
+  };
+
+  // Handle YouTube player state changes
+  const handleYoutubeStateChange = (event) => {
+    // YouTube state 0 is "ended"
+    if (event.data === 0 && onEnded) {
+      onEnded();
+    }
+    
+    // YouTube state -1 is "unstarted"
+    // YouTube state 1 is "playing"
+    if (event.data === 1) {
       setLoading(false);
-      setInitialLoadComplete(true);
-    } catch (error) {
-      
-      // Fall back to streaming if full download fails
-      
     }
   };
 
-  // Update video source when sources array or currentSourceIndex changes
-  useEffect(() => {
-    if (sources.length > 0 && currentSourceIndex < sources.length) {
-      const source = sources[currentSourceIndex];
-      
-      // Check if the source is a YouTube or other streaming video
-      // YouTube URLs can be in multiple formats, so check specifically for these patterns
-      const isYouTubeUrl = source.includes('youtube.com') || source.includes('youtu.be');
-      setIsYouTube(isYouTubeUrl);
-      
-      
-      
-      
-      if (isYouTubeUrl) {
-        // For YouTube, just set the source directly
-        setVideoSource(source);
-      } else {
-        // For local videos, try to preload the full video
-        loadFullVideo(source).catch(() => {
-          // If preloading fails, fall back to regular streaming
-          setVideoSource(source);
-        });
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sources, currentSourceIndex]);
+  // Handle YouTube player errors
+  const handleYoutubeError = (event) => {
+    console.error('YouTube error:', event);
+    setError('Failed to load YouTube video. Please try again later.');
+    setLoading(false);
+  };
 
-  // Set up video event listeners
+  // Handle YouTube player ready
+  const handleYoutubeReady = (event) => {
+    setLoading(false);
+  };
+
+  // Set up event listeners for MP4 video
   useEffect(() => {
+    if (videoType !== 'mp4') return;
+    
     const videoElement = videoRef.current;
-    
-    if (!videoElement || isYouTube) return;
-    
-    const handleVideoLoaded = () => {
-      
-      setLoading(false);
-      setInitialLoadComplete(true);
-    };
-    
-    const handleVideoError = (e) => {
-      
-      setError(`Error loading video: ${e.target.error ? e.target.error.message : 'Unknown error'}`);
-      setLoading(false);
-      
-      // Try next source if available
-      if (currentSourceIndex < sources.length - 1) {
-        setCurrentSourceIndex(prevIndex => prevIndex + 1);
-      }
-    };
-    
-    const handleEnded = () => {
-      
-      if (onVideoEnded) onVideoEnded();
-    };
-    
-    const handleTimeUpdate = () => {
-      if (onTimeUpdate) onTimeUpdate(videoElement.currentTime);
-    };
+    if (!videoElement) return;
     
     // Add event listeners
-    videoElement.addEventListener('loadeddata', handleVideoLoaded);
-    videoElement.addEventListener('error', handleVideoError);
-    videoElement.addEventListener('ended', handleEnded);
-    videoElement.addEventListener('timeupdate', handleTimeUpdate);
+    if (onEnded) {
+      videoElement.addEventListener('ended', onEnded);
+    }
+    
+    videoElement.addEventListener('loadeddata', () => {
+      setLoading(false);
+    });
+    
+    videoElement.addEventListener('error', (e) => {
+      console.error('Video error:', e);
+      setError('Failed to load video. Please try again later.');
+      setLoading(false);
+    });
     
     // Clean up event listeners on unmount
     return () => {
-      videoElement.removeEventListener('loadeddata', handleVideoLoaded);
-      videoElement.removeEventListener('error', handleVideoError);
-      videoElement.removeEventListener('ended', handleEnded);
-      videoElement.removeEventListener('timeupdate', handleTimeUpdate);
-    };
-  }, [onVideoEnded, onTimeUpdate, currentSourceIndex, sources, isYouTube]);
-
-  // Reset video when a new quiz becomes active (if enabled)
-  useEffect(() => {
-    if (resetVideoOnNewQuiz && !isQuizActive) {
-      if (isYouTube && reactPlayerRef.current) {
-        reactPlayerRef.current.seekTo(0);
-        // Don't attempt to autoplay - let user start playback
-      } else if (videoRef.current) {
-        videoRef.current.currentTime = 0;
-        // Don't attempt autoplay - browsers will block it
-        // videoRef.current.play().catch(e => );
+      if (onEnded) {
+        videoElement.removeEventListener('ended', onEnded);
       }
-    }
-  }, [isQuizActive, resetVideoOnNewQuiz, isYouTube]);
+      videoElement.removeEventListener('loadeddata', () => {
+        setLoading(false);
+      });
+      videoElement.removeEventListener('error', () => {
+        setError('Failed to load video. Please try again later.');
+        setLoading(false);
+      });
+    };
+  }, [videoType, onEnded]);
 
-  // Try the next source manually
-  const tryNextSource = () => {
-    if (currentSourceIndex < sources.length - 1) {
-      setCurrentSourceIndex(prevIndex => prevIndex + 1);
-      setError(null);
-      setLoading(true);
-      setInitialLoadComplete(false); // Reset on new source
-    }
-  };
+  // Get the formatted URL for MP4 videos
+  const formattedVideoUrl = getFormattedVideoUrl();
+
+  // Log debugging info
+  useEffect(() => {
+    console.log('VideoPlayer debug:', {
+      videoUrl,
+      videoType,
+      youtubeId,
+      formattedVideoUrl
+    });
+  }, [videoUrl, videoType, youtubeId, formattedVideoUrl]);
 
   return (
-    <div className="relative w-full h-full video-container">
-      {/* Debug info */}
-      <div className="mb-2 p-2 bg-gray-100 text-xs">
-        <div>Available sources: {sources.length}</div>
-        <div>Current source: {currentSourceIndex + 1}/{sources.length}</div>
-        <div>Current URL: {videoSource || 'None'}</div>
-        <div>Type: {isYouTube ? 'YouTube/Streaming' : 'Local File'}</div>
-        {error && <div className="text-red-500">Error: {error}</div>}
-      </div>
+    <div className="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden shadow-lg">
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-10">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+        </div>
+      )}
       
-      {/* Loading state - only show on initial load, not during buffering after video has started playing */}
-      {loading && !initialLoadComplete && (
-        <div className={isFullscreen ? "fullscreen-spinner" : "absolute inset-0 flex items-center justify-center bg-gray-200 bg-opacity-50 z-50"}>
-          <div className={isFullscreen ? "spinner-container" : "text-center"}>
-            <div className={isFullscreen ? "spinner" : "inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"}></div>
-            <p className={isFullscreen ? "spinner-text" : "mt-2 font-medium"}>Loading video...</p>
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-10">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            <p>{error}</p>
           </div>
         </div>
       )}
       
-      {/* Error state */}
-      {error && (
-        <div className="p-4 bg-red-100 border border-red-300 rounded">
-          <p className="text-red-700">{error}</p>
-          <p className="text-sm mt-2">Failed to load: {videoSource}</p>
-          {currentSourceIndex < sources.length - 1 && (
-            <button 
-              className="mt-2 px-4 py-2 bg-blue-500 text-white rounded"
-              onClick={tryNextSource}
-            >
-              Try next source
-            </button>
-          )}
+      {videoType === 'youtube' && youtubeId ? (
+        <div className="w-full h-full">
+          <YouTube
+            videoId={youtubeId}
+            opts={youtubeOpts}
+            onStateChange={handleYoutubeStateChange}
+            onReady={handleYoutubeReady}
+            onError={handleYoutubeError}
+            className="w-full h-full"
+          />
+        </div>
+      ) : formattedVideoUrl ? (
+        <div>
+          <video
+            ref={videoRef}
+            className="w-full h-full"
+            controls
+            autoPlay={autoplay}
+            controlsList="nodownload"
+            onContextMenu={(e) => e.preventDefault()} // Prevent right-click
+            playsInline // Better mobile support
+          >
+            <source src={formattedVideoUrl} type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-white">
+          <p>No video available</p>
         </div>
       )}
       
-      {/* Video element - conditionally render ReactPlayer for YouTube/streaming or regular video tag for local files */}
-      {videoSource && isYouTube ? (
-        <ReactPlayer
-          ref={reactPlayerRef}
-          url={videoSource}
-          className="w-full rounded-lg shadow-lg react-player"
-          width="100%"
-          height="auto"
-          controls={true}
-          playing={false} // Changed from !isQuizActive to false to prevent autoplay errors
-          onEnded={onVideoEnded}
-          onProgress={(state) => {
-            if (onTimeUpdate) onTimeUpdate(state.playedSeconds);
-          }}
-          onError={(e) => {
-            
-            setError(`Error loading streaming video: ${e?.message || 'Unknown error'}`);
-            setLoading(false);
-          }}
-          onBuffer={() => {
-            // Only set loading if initial load hasn't completed
-            if (!initialLoadComplete) setLoading(true);
-          }}
-          onBufferEnd={() => setLoading(false)}
-          onReady={() => {
-            setLoading(false);
-            setInitialLoadComplete(true);
-          }}
-          config={{
-            youtube: {
-              playerVars: { 
-                origin: window.location.origin,
-                modestbranding: 1,
-                rel: 0,
-                // Enable preloading for YouTube videos
-                preload: 1
-              }
-            },
-            file: {
-              attributes: {
-                crossOrigin: "anonymous",
-                preload: "auto"
-              },
-              forceVideo: true,
-              forcedPreload: true
-            }
-          }}
-        />
-      ) : (
-        <video
-          ref={videoRef}
-          className="w-full rounded-lg shadow-lg"
-          controls
-          src={videoSource}
-          autoPlay={false} // Changed from true to false to prevent autoplay errors
-          preload="auto" // Force preloading of the entire video
-          onCanPlayThrough={() => {
-            setLoading(false);
-            setInitialLoadComplete(true);
-          }}
-          onLoadStart={() => {
-            // Only set loading for initial load
-            if (!initialLoadComplete) setLoading(true);
-          }}
-          onWaiting={() => {
-            // Only set loading for initial load
-            if (!initialLoadComplete) setLoading(true);
-          }}
-          onPlaying={() => {
-            setLoading(false);
-            setInitialLoadComplete(true);
-          }}
-          key={videoSource} // Important: Re-mount video when source changes
-        >
-          Your browser does not support the video tag.
-        </video>
-      )}
+      <div className="absolute bottom-4 right-4 flex space-x-2">
+        {process.env.NODE_ENV === 'development' && (
+          <button
+            onClick={onEnded}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+          >
+            Skip Video (Dev Only)
+          </button>
+        )}
+      </div>
     </div>
   );
 };

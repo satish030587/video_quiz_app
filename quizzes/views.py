@@ -227,9 +227,27 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
         attempt.status = 'completed'
         attempt.save()
         
-        # Update user progress dynamically using the new method
-        from users.models import UserProgress
-        UserProgress.update_user_progress(request.user)
+        # Update user progress if passed
+        if attempt.is_passed:
+            progress, created = UserProgress.objects.get_or_create(user=request.user)
+            progress.videos_passed.add(attempt.video)
+            if attempt.video in progress.videos_failed.all():
+                progress.videos_failed.remove(attempt.video)
+            progress.total_retries = QuizAttempt.objects.filter(
+                user=request.user, 
+                attempt_number__gt=1
+            ).count()
+            
+            # Use sync_with_quiz_attempts to ensure complete consistency
+            progress.sync_with_quiz_attempts()
+        else:
+            # If failed and this is the second attempt, mark as failed in progress
+            if attempt.attempt_number >= 2:
+                progress, created = UserProgress.objects.get_or_create(user=request.user)
+                progress.videos_failed.add(attempt.video)
+                # Use sync_with_quiz_attempts to ensure complete consistency
+                progress.sync_with_quiz_attempts()
+                progress.save()
         
         # Return quiz results
         serializer = QuizResultSerializer(attempt)

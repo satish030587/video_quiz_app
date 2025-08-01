@@ -68,7 +68,11 @@ class UserProgressViewSet(viewsets.ReadOnlyModelViewSet):
         try:
             progress = UserProgress.objects.get(user=request.user)
             # Recalculate progress to ensure it's up to date
-            progress.recalculate_progress()
+            try:
+                progress.recalculate_progress()
+            except AttributeError:
+                # If the method doesn't exist, just continue
+                pass
             serializer = self.get_serializer(progress)
             return Response(serializer.data)
         except UserProgress.DoesNotExist:

@@ -30,7 +30,7 @@ const IconChart = () => (
   </svg>
 );
 
-const StatsCard = ({ title, value, icon, color = 'blue', description }) => {
+const StatsCard = ({ title, value, icon, color = 'blue' }) => {
   const colorClasses = {
     blue: 'bg-blue-50 text-blue-700 border-blue-200',
     green: 'bg-green-50 text-green-700 border-green-200',
@@ -57,17 +57,12 @@ const StatsCard = ({ title, value, icon, color = 'blue', description }) => {
   };
 
   return (
-    <div className={`rounded-lg border shadow-sm p-4 ${colorClasses[color]} transition-all duration-200 hover:shadow-md`}>
-      <div className="flex items-start">
-        <div className="p-2 rounded-md bg-white bg-opacity-40 mr-3">
-          {renderIcon()}
-        </div>
+    <div className={`rounded-lg border p-4 ${colorClasses[color]}`}>
+      <div className="flex items-center">
+        <div className="mr-3">{renderIcon()}</div>
         <div>
           <p className="text-sm font-medium opacity-75">{title}</p>
-          <p className="text-2xl font-bold my-1">{value}</p>
-          {description && (
-            <p className="text-xs opacity-70">{description}</p>
-          )}
+          <p className="text-2xl font-semibold">{value}</p>
         </div>
       </div>
     </div>
